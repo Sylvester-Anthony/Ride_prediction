@@ -5,4 +5,5 @@ url = 'https://s3.amazonaws.com/tripdata/index.html'
 
 html_content = requests.get(url).text
 
-print(html_content)
+soup = BeautifulSoup(html_content, "html.parser")
+print(soup.find_all('tr'))
