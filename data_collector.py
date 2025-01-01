@@ -1,36 +1,42 @@
-# from bs4 import BeautifulSoup
-# import requests
+import asyncio
+from pyppeteer import launch
+from bs4 import BeautifulSoup
 
-# url = 'https://s3.amazonaws.com/tripdata/index.html'
+async def scrape_tbody():
+    # Launch a browser (non-headless for debugging)
+    browser = await launch(headless=False, args=['--no-sandbox'])
+    page = await browser.newPage()
 
-# html_content = requests.get(url)
+    # Navigate to the URL
+    url = "https://s3.amazonaws.com/tripdata/index.html"  # Replace with your actual URL
+    await page.goto(url)
 
-# print(html_content.text)
+    # Wait for the page to load completely
+    await page.waitForSelector('#tbody-content')
+    await asyncio.sleep(5)  # Wait for JavaScript execution (5 seconds)
 
-# # # soup = BeautifulSoup(html_content, 'html.parser')
+    # Capture the tbody content
+    try:
+        tbody_html = await page.querySelectorEval('#tbody-content', '(element) => element.outerHTML')
+        print("Extracted HTML:", tbody_html)
+    except Exception as e:
+        print("Error extracting tbody content:", e)
+        tbody_html = None
 
-# # # td_tags = soup.find('tbody').find_all('tr')
+    # Close the browser
+    await browser.close()
 
-# # # print(td_tags)
+    if tbody_html:
+        # Parse the HTML with BeautifulSoup
+        soup = BeautifulSoup(tbody_html, 'html.parser')
+        rows = soup.find_all('tr')
 
-# # # td_texts = [td.get_text(strip=True) for td in td_tags]
+        if not rows:
+            print("No rows found! Check data population logic.")
+        else:
+            for row in rows:
+                columns = [col.get_text(strip=True) for col in row.find_all('td')]
+                print(columns)
 
-# # # print(td_texts)
-
-from requests_html import HTMLSession
-
-# Create an HTML Session
-session = HTMLSession()
-
-# URL of the webpage
-url = "https://s3.amazonaws.com/tripdata/index.html"
-
-# Get the webpage content
-response = session.get(url)
-
-# Execute JavaScript
-response.html.render(timeout=20)  # Render the page, allowing JavaScript to execute
-
-# Extract the dynamic content from <tbody>
-tbody_content = response.html.find('#tbody-content', first=True).html
-print(tbody_content)
+# Run the coroutine
+asyncio.get_event_loop().run_until_complete(scrape_tbody())
