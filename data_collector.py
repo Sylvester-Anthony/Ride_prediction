@@ -1,6 +1,7 @@
 import asyncio
 from pyppeteer import launch
 from bs4 import BeautifulSoup
+import pandas as pd
 
 async def scrape_tbody():
     # Launch a browser (non-headless for debugging)
@@ -18,7 +19,6 @@ async def scrape_tbody():
     # Capture the tbody content
     try:
         tbody_html = await page.querySelectorEval('#tbody-content', '(element) => element.outerHTML')
-        print("Extracted HTML:", tbody_html)
     except Exception as e:
         print("Error extracting tbody content:", e)
         tbody_html = None
@@ -34,9 +34,23 @@ async def scrape_tbody():
         if not rows:
             print("No rows found! Check data population logic.")
         else:
+            # Extract data into a list
+            data = []
             for row in rows:
-                columns = [col.get_text(strip=True) for col in row.find_all('td')]
-                print(columns)
+                link = row.find('a')
+                if link:
+                    href = link.get('href')
+                    text = link.get_text(strip=True)
+                    if 'JC' in text:
+                        data.append({'Filename': text, 'URL': href})
+            
+            # Convert the list to a DataFrame
+            df = pd.DataFrame(data)
+
+            # Save the DataFrame to a CSV file
+            output_file = 'output.csv'
+            df.to_csv(output_file, index=False)
+            print(f"Data successfully saved to {output_file}")
 
 # Run the coroutine
 asyncio.get_event_loop().run_until_complete(scrape_tbody())
