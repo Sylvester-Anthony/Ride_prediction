@@ -4,8 +4,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import os
 
-# Define the base file name for the CSV
-BASE_CSV_FILE = 'file_data.csv'
+# Define the base folder and file name
+BASE_FOLDER = 'scraped_data'
+BASE_CSV_FILE = os.path.join(BASE_FOLDER, 'file_data.csv')
 
 async def scrape_tbody():
     # Launch a browser (headless for normal usage)
@@ -49,9 +50,14 @@ async def scrape_tbody():
                         data.append({'Filename': text, 'URL': href})
     return data
 
+def create_folder(folder_path):
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        print(f"Folder created: {folder_path}")
+
 def create_csv(data, version=0):
     # Create the file name with versioning if required
-    file_name = BASE_CSV_FILE if version == 0 else f"file_data_v{version}.csv"
+    file_name = BASE_CSV_FILE if version == 0 else os.path.join(BASE_FOLDER, f"file_data_v{version}.csv")
 
     # Create a new DataFrame from the scraped data
     df = pd.DataFrame(data)
@@ -74,7 +80,7 @@ def update_csv(new_data):
     if len(combined_df) > len(existing_df):
         # Find the next version number
         version = 1
-        while os.path.exists(f"file_data_v{version}.csv"):
+        while os.path.exists(os.path.join(BASE_FOLDER, f"file_data_v{version}.csv")):
             version += 1
 
         # Save the updated DataFrame as a new version
@@ -84,6 +90,9 @@ def update_csv(new_data):
         print("No new files detected. No updates made.")
 
 async def main():
+    # Ensure the base folder exists
+    create_folder(BASE_FOLDER)
+
     if not os.path.exists(BASE_CSV_FILE):
         # No CSV file found; perform initial scrape and save
         print("No existing CSV file found. Scraping data for the first time...")
