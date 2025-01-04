@@ -102,7 +102,6 @@ async def main():
         else:
             print("No data scraped from the website.")
     else:
-        # CSV file exists; check for updates
         print("Existing CSV file found. Checking for updates...")
         data = await scrape_tbody()
         if data:
@@ -110,5 +109,5 @@ async def main():
         else:
             print("No data scraped from the website.")
 
-# Run the main coroutine
+
 asyncio.get_event_loop().run_until_complete(main())
