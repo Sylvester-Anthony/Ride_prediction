@@ -9,7 +9,13 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
-BASE_FOLDER = 'scraped_data'
+# BASE_FOLDER = 'scraped_data'
+# BASE_CSV_FILE = os.path.join(BASE_FOLDER, 'file_data.csv')
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Define the base folder path
+BASE_FOLDER = os.path.join(SCRIPT_DIR, 'scraped_data')
 BASE_CSV_FILE = os.path.join(BASE_FOLDER, 'file_data.csv')
 
 async def scrape_tbody():
