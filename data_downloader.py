@@ -86,7 +86,7 @@ combined_df = spark.read.csv(extracted_files_pattern, header=True, inferSchema=T
 # Show combined data
 combined_df.show(truncate=False)
 
-# Optional: Save combined data to a single file (e.g., Parquet for efficiency)
+
 combined_df.write.parquet("combined_data.parquet", mode="overwrite")
 
 print("All extracted data has been combined into a single DataFrame.")
