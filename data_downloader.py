@@ -5,7 +5,6 @@ from zipfile import ZipFile
 from io import BytesIO
 from pyspark.sql import SparkSession
 
-# Function to download and extract files
 def download_and_extract(url, output_folder):
     try:
         # Send a GET request to the URL
