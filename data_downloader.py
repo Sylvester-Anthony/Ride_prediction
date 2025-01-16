@@ -115,10 +115,9 @@ combined_df = spark.read.csv(extracted_files_pattern, header=True, inferSchema=T
 # Show combined data
 combined_df.show(truncate=False)
 
-# Write combined data to Parquet
+
 combined_df.write.parquet("combined_data.parquet", mode="overwrite")
 print("All extracted data has been combined into a single DataFrame and written to Parquet.")
 
-# Write combined data to PostgreSQL
 combined_df.write.jdbc(url=db_url, table=db_table, mode="overwrite", properties=db_properties)
 print("Data has been successfully written to the PostgreSQL database.")
