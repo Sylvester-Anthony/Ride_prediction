@@ -1,123 +1,78 @@
-# import os
-# import pandas as pd
-# import requests
-# from zipfile import ZipFile
-# from io import BytesIO
-# from pyspark.sql import SparkSession
-
-# def download_and_extract(url, output_folder):
-#     try:
-#         # Send a GET request to the URL
-#         response = requests.get(url)
-#         response.raise_for_status()  # Raise an error for bad status codes
-        
-#         # Read the ZIP file from the response content
-#         with ZipFile(BytesIO(response.content)) as zf:
-#             zf.extractall(output_folder)  # Extract files to the output folder
-#         print(f"Downloaded and extracted: {url}")
-#     except Exception as e:
-#         print(f"Failed to process {url}: {e}")
-
-# # Path to the CSV file
-# csv_file = '/Users/sylvesteranthony/Documents/Ride_prediction/scraped_data/file_data.csv'  # Update with your file path
-
-# # Output folder to store the extracted files
-# output_folder = 'extracted_files'
-# os.makedirs(output_folder, exist_ok=True)
-
-# # Read the CSV file
-# df = pd.read_csv(csv_file)
-
-# # Loop through each URL in the CSV and process it
-# for url in df['URL']:
-#     download_and_extract(url, output_folder)
-
-# print("All files have been downloaded and extracted.")
-
-# # Initialize Spark Session
-# spark = SparkSession.builder \
-#     .appName("Combine Extracted Files") \
-#     .getOrCreate()
-
-# # Define the file path pattern to read all extracted files (assuming CSV format)
-# extracted_files_pattern = os.path.join(output_folder, "*.csv")
-
-# # Read all extracted CSV files into a single Spark DataFrame
-# combined_df = spark.read.csv(extracted_files_pattern, header=True, inferSchema=True)
-
-# # Show combined data
-# combined_df.show(truncate=False)
-
-
-# combined_df.write.parquet("combined_data.parquet", mode="overwrite")
-
-# print("All extracted data has been combined into a single DataFrame.")
-
-
 import os
 import pandas as pd
 import requests
 from zipfile import ZipFile
 from io import BytesIO
+import psycopg2
 from pyspark.sql import SparkSession
 
 # Function to download and extract files
 def download_and_extract(url, output_folder):
     try:
-        # Send a GET request to the URL
         response = requests.get(url)
-        response.raise_for_status()  # Raise an error for bad status codes
-        
-        # Read the ZIP file from the response content
+        response.raise_for_status()
         with ZipFile(BytesIO(response.content)) as zf:
-            zf.extractall(output_folder)  # Extract files to the output folder
+            zf.extractall(output_folder)
         print(f"Downloaded and extracted: {url}")
     except Exception as e:
         print(f"Failed to process {url}: {e}")
 
-# Path to the CSV file
-csv_file = '/Users/sylvesteranthony/Documents/Ride_prediction/scraped_data/file_data.csv'  # Update with your file path
+# PostgreSQL connection details (no password)
+db_host = "localhost"
+db_port = "5432"
+db_user = "sylvesteranthony"
+db_name = "ride_prediction"  # New database name
+db_table = "combined_data"
+jdbc_url = f"jdbc:postgresql://{db_host}:{db_port}/{db_name}"
 
-# Output folder to store the extracted files
+# Create PostgreSQL database and table dynamically
+def create_db_and_table(schema, db_host, db_port, db_user, db_name, db_table):
+    try:
+        conn = psycopg2.connect(
+            dbname="postgres", user=db_user, host=db_host, port=db_port
+        )
+        conn.autocommit = True
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT 1 FROM pg_database WHERE datname = '{db_name}'")
+        if not cursor.fetchone():
+            cursor.execute(f"CREATE DATABASE {db_name}")
+            print(f"Database '{db_name}' created.")
+        else:
+            print(f"Database '{db_name}' already exists.")
+        cursor.close()
+        conn.close()
+        conn = psycopg2.connect(dbname=db_name, user=db_user, host=db_host, port=db_port)
+        cursor = conn.cursor()
+        columns = ", ".join([f"{col} {dtype}" for col, dtype in schema.items()])
+        create_table_query = f"CREATE TABLE IF NOT EXISTS {db_table} ({columns})"
+        cursor.execute(create_table_query)
+        print(f"Table '{db_table}' created with schema: {schema}")
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error creating database or table: {e}")
+
+# Path to the CSV file
+csv_file = '/Users/sylvesteranthony/Documents/Ride_prediction/scraped_data/file_data.csv'
 output_folder = 'extracted_files'
 os.makedirs(output_folder, exist_ok=True)
-
-# Read the CSV file
 df = pd.read_csv(csv_file)
-
-# Loop through each URL in the CSV and process it
 for url in df['URL']:
     download_and_extract(url, output_folder)
-
 print("All files have been downloaded and extracted.")
 
-# PostgreSQL connection details
-db_url = "jdbc:postgresql://<HOST>:<PORT>/<DATABASE>"  # Replace <HOST>, <PORT>, and <DATABASE>
-db_table = "combined_data"  # Target table name in PostgreSQL
-db_properties = {
-    "user": "<USERNAME>",  # Replace with your PostgreSQL username
-    "password": "<PASSWORD>",  # Replace with your PostgreSQL password
-    "driver": "org.postgresql.Driver"
-}
-
-# Initialize Spark Session
 spark = SparkSession.builder \
     .appName("Combine and Write to PostgreSQL") \
-    .config("spark.jars", "/path/to/postgresql-<version>.jar") \
-    .getOrCreate() 
+    .config("spark.jars", "/Users/sylvesteranthony/Documents/Ride_prediction/postgresql-42.7.5.jar") \
+    .getOrCreate()
 
-# Define the file path pattern to read all extracted files (assuming CSV format)
 extracted_files_pattern = os.path.join(output_folder, "*.csv")
-
-# Read all extracted CSV files into a single Spark DataFrame
 combined_df = spark.read.csv(extracted_files_pattern, header=True, inferSchema=True)
-
-# Show combined data
-combined_df.show(truncate=False)
-
-
-combined_df.write.parquet("combined_data.parquet", mode="overwrite")
-print("All extracted data has been combined into a single DataFrame and written to Parquet.")
-
-combined_df.write.jdbc(url=db_url, table=db_table, mode="overwrite", properties=db_properties)
+schema = {field.name: "TEXT" if field.dataType.simpleString() == "string" else "FLOAT" for field in combined_df.schema.fields}
+create_db_and_table(schema, db_host, db_port, db_user, db_name, db_table)
+combined_df.write.jdbc(url=jdbc_url, table=db_table, mode="overwrite", properties={
+    "user": db_user,
+    "driver": "org.postgresql.Driver"
+})
 print("Data has been successfully written to the PostgreSQL database.")
